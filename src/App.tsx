@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import "./App.css";
+import { supabase } from "./lib/supabaseClient";
 
 type ScreenState =
   | "arrival"
@@ -500,6 +501,108 @@ function App() {
     historyOverride.text.trim()
       ? historyOverride
       : automaticHistoryMoment;
+
+useEffect(() => {
+  async function loadSharedClassroomData() {
+    // --------------------------------
+    // LOAD CLASS-SPECIFIC CONTENT
+    // --------------------------------
+
+    const {
+      data: classRows,
+      error: classError,
+    } = await supabase
+      .from("class_content")
+      .select(
+        "class_id, bell_ringer, slides_url, discussion_prompt"
+      );
+
+    if (classError) {
+      console.error(
+        "Could not load class content:",
+        classError
+      );
+    } else if (classRows) {
+      const nextBellRingers = {
+        ...defaultBellRingers,
+      };
+
+      const nextSlides = {
+        ...defaultSlides,
+      };
+
+      const nextDiscussions = {
+        ...defaultDiscussions,
+      };
+
+      classRows.forEach((row) => {
+        const classId =
+          row.class_id as ClassName;
+
+        if (classId in classes) {
+          nextBellRingers[classId] =
+            row.bell_ringer ?? "";
+
+          nextSlides[classId] =
+            row.slides_url ?? "";
+
+          nextDiscussions[classId] =
+            row.discussion_prompt ?? "";
+        }
+      });
+
+      setBellRingers(nextBellRingers);
+      setSlidesByClass(nextSlides);
+      setDiscussionsByClass(nextDiscussions);
+    }
+
+    // --------------------------------
+    // LOAD ROOM-WIDE DISPLAY SETTINGS
+    // --------------------------------
+
+    const {
+      data: displayRow,
+      error: displayError,
+    } = await supabase
+      .from("display_settings")
+      .select(
+        `
+        ticker,
+        now_playing_title,
+        now_playing_artist,
+        history_override_year,
+        history_override_text
+        `
+      )
+      .eq("id", "main")
+      .single();
+
+    if (displayError) {
+      console.error(
+        "Could not load display settings:",
+        displayError
+      );
+    } else if (displayRow) {
+      setTicker(displayRow.ticker ?? "");
+
+      setNowPlaying({
+        title:
+          displayRow.now_playing_title ?? "",
+        artist:
+          displayRow.now_playing_artist ?? "",
+      });
+
+      setHistoryOverride({
+        year:
+          displayRow.history_override_year ?? "",
+        text:
+          displayRow.history_override_text ?? "",
+      });
+    }
+  }
+
+  loadSharedClassroomData();
+}, []);
 
   const course: Course = {
     ...classes[currentClass],
