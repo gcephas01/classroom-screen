@@ -636,7 +636,102 @@ useEffect(() => {
   loadSharedClassroomData();
 }, []);
 
-    const course: Course = {
+  useEffect(() => {
+    type ClassContentRealtimeRow = {
+      class_id: string;
+      bell_ringer: string | null;
+      slides_url: string | null;
+      discussion_prompt: string | null;
+    };
+
+    type DisplaySettingsRealtimeRow = {
+      id: string;
+      ticker: string | null;
+      now_playing_title: string | null;
+      now_playing_artist: string | null;
+      history_override_year: string | null;
+      history_override_text: string | null;
+    };
+
+    const classroomChannel = supabase
+      .channel("classroom-screen-live")
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "class_content",
+        },
+        (payload) => {
+          const row = payload.new as ClassContentRealtimeRow;
+          const classId = row.class_id as ClassName;
+
+          if (!(classId in classes)) {
+            return;
+          }
+
+          setBellRingers((previous) => ({
+            ...previous,
+            [classId]: row.bell_ringer ?? "",
+          }));
+
+          setSlidesByClass((previous) => ({
+            ...previous,
+            [classId]: row.slides_url ?? "",
+          }));
+
+          setDiscussionsByClass((previous) => ({
+            ...previous,
+            [classId]: row.discussion_prompt ?? "",
+          }));
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "display_settings",
+          filter: "id=eq.main",
+        },
+        (payload) => {
+          const row = payload.new as DisplaySettingsRealtimeRow;
+
+          setTicker(row.ticker ?? "");
+
+          setNowPlaying({
+            title: row.now_playing_title ?? "",
+            artist: row.now_playing_artist ?? "",
+          });
+
+          setHistoryOverride({
+            year: row.history_override_year ?? "",
+            text: row.history_override_text ?? "",
+          });
+        },
+      )
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          console.log("Classroom realtime connected.");
+        }
+
+        if (
+          status === "CHANNEL_ERROR" ||
+          status === "TIMED_OUT"
+        ) {
+          console.error(
+            "Classroom realtime connection problem:",
+            status,
+          );
+        }
+      });
+
+    return () => {
+      void supabase.removeChannel(classroomChannel);
+    };
+  }, []);
+
+  const course: Course = {
     ...classes[currentClass],
     bellRinger: bellRingers[currentClass],
     slides: slidesByClass[currentClass],
