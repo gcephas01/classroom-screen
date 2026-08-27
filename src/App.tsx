@@ -604,7 +604,7 @@ useEffect(() => {
   loadSharedClassroomData();
 }, []);
 
-  const course: Course = {
+    const course: Course = {
     ...classes[currentClass],
     bellRinger: bellRingers[currentClass],
     slides: slidesByClass[currentClass],
