@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import "./App.css";
 import { supabase } from "./lib/supabaseClient";
+import type { Session } from "@supabase/supabase-js";
 
 type ScreenState =
   | "arrival"
@@ -156,6 +157,12 @@ function App() {
 
   const [controlCenterOpen, setControlCenterOpen] =
     useState(false);
+
+  const [loginOpen, setLoginOpen] =
+    useState(false);
+
+  const [session, setSession] =
+    useState<Session | null>(null);
 
   const [timerSeconds, setTimerSeconds] =
     useState(10 * 60);
@@ -502,6 +509,31 @@ function App() {
       ? historyOverride
       : automaticHistoryMoment;
 
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  function openSetup() {
+    if (session) {
+      setControlCenterOpen(true);
+      return;
+    }
+
+    setLoginOpen(true);
+  }
+
 useEffect(() => {
   async function loadSharedClassroomData() {
     // --------------------------------
@@ -651,7 +683,7 @@ useEffect(() => {
           currentClass={currentClass}
           changeClass={setCurrentClass}
           changeScreen={setScreenState}
-          openControlCenter={() => setControlCenterOpen(true)}
+          openControlCenter={openSetup}
         />
       )}
 
@@ -667,7 +699,7 @@ useEffect(() => {
           automaticHistoryMoment={automaticHistoryMoment}
           historyOverride={historyOverride}
           close={() => setControlCenterOpen(false)}
-          save={(
+          save={async (
             bellRinger,
             slides,
             discussion,
@@ -675,34 +707,94 @@ useEffect(() => {
             newNowPlaying,
             newHistoryOverride,
           ) => {
+            if (!session) {
+              setControlCenterOpen(false);
+              setLoginOpen(true);
+              return false;
+            }
+
+            const cleanBellRinger = bellRinger.trim();
+            const cleanSlides = normalizeGoogleSlidesUrl(slides);
+            const cleanDiscussion = discussion.trim();
+            const cleanTicker = newTicker.trim();
+            const cleanNowPlaying = {
+              title: newNowPlaying.title.trim(),
+              artist: newNowPlaying.artist.trim(),
+            };
+            const cleanHistoryOverride = {
+              year: newHistoryOverride.year.trim(),
+              text: newHistoryOverride.text.trim(),
+            };
+            const updatedAt = new Date().toISOString();
+
+            const [classResult, displayResult] = await Promise.all([
+              supabase
+                .from("class_content")
+                .update({
+                  bell_ringer: cleanBellRinger,
+                  slides_url: cleanSlides,
+                  discussion_prompt: cleanDiscussion,
+                  updated_at: updatedAt,
+                })
+                .eq("class_id", currentClass)
+                .select("class_id")
+                .single(),
+
+              supabase
+                .from("display_settings")
+                .update({
+                  ticker: cleanTicker,
+                  now_playing_title: cleanNowPlaying.title,
+                  now_playing_artist: cleanNowPlaying.artist,
+                  history_override_year: cleanHistoryOverride.year,
+                  history_override_text: cleanHistoryOverride.text,
+                  updated_at: updatedAt,
+                })
+                .eq("id", "main")
+                .select("id")
+                .single(),
+            ]);
+
+            if (classResult.error || displayResult.error) {
+              console.error("Class save error:", classResult.error);
+              console.error("Display save error:", displayResult.error);
+              window.alert(
+                "The classroom changes could not be saved. Check your Supabase permissions and try again.",
+              );
+              return false;
+            }
+
             setBellRingers((previous) => ({
               ...previous,
-              [currentClass]: bellRinger.trim(),
+              [currentClass]: cleanBellRinger,
             }));
 
             setSlidesByClass((previous) => ({
               ...previous,
-              [currentClass]: normalizeGoogleSlidesUrl(slides),
+              [currentClass]: cleanSlides,
             }));
 
             setDiscussionsByClass((previous) => ({
               ...previous,
-              [currentClass]: discussion.trim(),
+              [currentClass]: cleanDiscussion,
             }));
 
-            setTicker(newTicker.trim());
-
-            setNowPlaying({
-              title: newNowPlaying.title.trim(),
-              artist: newNowPlaying.artist.trim(),
-            });
-
-            setHistoryOverride({
-              year: newHistoryOverride.year.trim(),
-              text: newHistoryOverride.text.trim(),
-            });
+            setTicker(cleanTicker);
+            setNowPlaying(cleanNowPlaying);
+            setHistoryOverride(cleanHistoryOverride);
 
             setControlCenterOpen(false);
+            return true;
+          }}
+        />
+      )}
+
+      {loginOpen && (
+        <LoginModal
+          close={() => setLoginOpen(false)}
+          success={() => {
+            setLoginOpen(false);
+            setControlCenterOpen(true);
           }}
         />
       )}
@@ -989,6 +1081,20 @@ function TeacherControls({
     setOpen(false);
   }
 
+  async function toggleFullscreen() {
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+      } else {
+        await document.exitFullscreen();
+      }
+
+      setOpen(false);
+    } catch (error) {
+      console.error("Fullscreen failed:", error);
+    }
+  }
+
   return (
     <div className="teacherPanel">
       {open && (
@@ -1022,6 +1128,10 @@ function TeacherControls({
             Timer
           </button>
 
+          <button onClick={toggleFullscreen}>
+            ⛶ Fullscreen
+          </button>
+
           <button
             className="setupButton"
             onClick={() => {
@@ -1041,6 +1151,133 @@ function TeacherControls({
       >
         C
       </button>
+    </div>
+  );
+}
+
+/* -------------------------------- */
+/* LOGIN                            */
+/* -------------------------------- */
+
+function LoginModal({
+  close,
+  success,
+}: {
+  close: () => void;
+  success: () => void;
+}) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [working, setWorking] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+
+  async function signIn() {
+    if (!email.trim() || !password) {
+      setErrorMessage("Enter your email and password.");
+      return;
+    }
+
+    setWorking(true);
+    setErrorMessage("");
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
+
+    setWorking(false);
+
+    if (error) {
+      setErrorMessage(error.message);
+      return;
+    }
+
+    success();
+  }
+
+  return (
+    <div
+      className="controlCenterBackdrop"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          close();
+        }
+      }}
+    >
+      <section
+        className="authCard"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Teacher Login"
+      >
+        <header className="authHeader">
+          <div>
+            <small>CEPHAS CLASSROOM</small>
+            <h2>Teacher Login</h2>
+          </div>
+
+          <button
+            className="controlCenterClose"
+            onClick={close}
+            aria-label="Close login"
+          >
+            ×
+          </button>
+        </header>
+
+        <div className="authBody">
+          <p className="authIntro">
+            Sign in to edit classroom content.
+          </p>
+
+          <label htmlFor="teacher-email">EMAIL</label>
+          <input
+            id="teacher-email"
+            type="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            autoComplete="email"
+            placeholder="you@example.com"
+          />
+
+          <label htmlFor="teacher-password">PASSWORD</label>
+          <input
+            id="teacher-password"
+            type="password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !working) {
+                void signIn();
+              }
+            }}
+            autoComplete="current-password"
+            placeholder="Password"
+          />
+
+          {errorMessage && (
+            <p className="authError">{errorMessage}</p>
+          )}
+        </div>
+
+        <footer className="controlCenterFooter">
+          <button
+            className="controlCancel"
+            onClick={close}
+            disabled={working}
+          >
+            Cancel
+          </button>
+
+          <button
+            className="controlSave"
+            onClick={() => void signIn()}
+            disabled={working}
+          >
+            {working ? "SIGNING IN..." : "SIGN IN"}
+          </button>
+        </footer>
+      </section>
     </div>
   );
 }
@@ -1079,7 +1316,7 @@ function ControlCenter({
     ticker: string,
     nowPlaying: NowPlaying,
     historyOverride: HistoryMoment,
-  ) => void;
+  ) => Promise<boolean>;
 }) {
   const [bellRingerDraft, setBellRingerDraft] =
     useState(bellRinger);
@@ -1104,6 +1341,9 @@ function ControlCenter({
 
   const [historyTextDraft, setHistoryTextDraft] =
     useState(historyOverride.text);
+
+  const [saving, setSaving] =
+    useState(false);
 
   useEffect(() => {
     setBellRingerDraft(bellRinger);
@@ -1342,8 +1582,11 @@ function ControlCenter({
 
           <button
             className="controlSave"
-            onClick={() =>
-              save(
+            disabled={saving}
+            onClick={async () => {
+              setSaving(true);
+
+              const saved = await save(
                 bellRingerDraft,
                 slidesDraft,
                 discussionDraft,
@@ -1356,10 +1599,14 @@ function ControlCenter({
                   year: historyYearDraft,
                   text: historyTextDraft,
                 },
-              )
-            }
+              );
+
+              if (!saved) {
+                setSaving(false);
+              }
+            }}
           >
-            Save All
+            {saving ? "SAVING..." : "Save All"}
           </button>
         </footer>
       </section>

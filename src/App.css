@@ -16,10 +16,9 @@ button {
 
 .app {
   width: 100vw;
-  height: 100vh;
+  height: 100dvh;
   position: relative;
 }
-
 /* ARRIVAL */
 
 .arrival {
@@ -981,3 +980,107 @@ button {
     grid-template-columns: 1fr;
   }
 }
+
+/* =========================================
+   TEACHER AUTHENTICATION
+   ========================================= */
+
+.authCard {
+  width: min(480px, 92vw);
+  overflow: hidden;
+
+  background: #f3efe5;
+  color: #111111;
+
+  border: 1px solid rgba(17, 17, 17, 0.2);
+  border-top: 5px solid #b97832;
+  border-radius: 12px;
+
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.35);
+}
+
+.authHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+
+  padding: 24px 28px 20px;
+
+  border-bottom: 1px solid rgba(17, 17, 17, 0.14);
+}
+
+.authHeader small {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: #77736d;
+}
+
+.authHeader h2 {
+  margin: 5px 0 0;
+
+  font-family: "Archivo", sans-serif;
+  font-size: 2rem;
+  letter-spacing: -0.04em;
+}
+
+.authBody {
+  padding: 24px 28px 28px;
+}
+
+.authIntro {
+  margin: 0 0 22px;
+  color: #5f5b55;
+  font-family: "Archivo", sans-serif;
+  line-height: 1.45;
+}
+
+.authBody label {
+  display: block;
+  margin: 16px 0 7px;
+
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+
+  color: #77736d;
+}
+
+.authBody input {
+  width: 100%;
+  padding: 13px 14px;
+
+  border: 1px solid rgba(17, 17, 17, 0.22);
+  border-radius: 7px;
+
+  background: rgba(255, 255, 255, 0.5);
+  color: #111111;
+
+  font-family: "Archivo", sans-serif;
+  font-size: 1rem;
+
+  outline: none;
+}
+
+.authBody input:focus {
+  border-color: #b97832;
+  box-shadow: 0 0 0 3px rgba(185, 120, 50, 0.12);
+}
+
+.authError {
+  margin: 14px 0 0;
+
+  color: #8b2e2e;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.controlSave:disabled,
+.controlCancel:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
