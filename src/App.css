@@ -1084,3 +1084,44 @@ button {
   cursor: default;
 }
 
+/* =========================================
+   FULLSCREEN / ONESCREEN TICKER FIX
+   Keeps the ticker pinned to the visible
+   bottom edge when the browser is fullscreen.
+   ========================================= */
+
+:fullscreen .arrival {
+  grid-template-rows: 1fr;
+  padding-bottom: 52px;
+}
+
+:fullscreen .ticker {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+
+  width: 100%;
+  height: 52px;
+
+  z-index: 90;
+}
+
+/* Chromium/WebKit fallback */
+:-webkit-full-screen .arrival {
+  grid-template-rows: 1fr;
+  padding-bottom: 52px;
+}
+
+:-webkit-full-screen .ticker {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+
+  width: 100%;
+  height: 52px;
+
+  z-index: 90;
+}
+
