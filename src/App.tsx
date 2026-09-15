@@ -7,6 +7,7 @@ type ScreenState =
   | "arrival"
   | "lesson"
   | "discussion"
+  | "document"
   | "timer";
 
 type ClassName =
@@ -21,6 +22,7 @@ type Course = {
   bellRinger: string;
   slides: string;
   discussion: string;
+  documentUrl: string;
 };
 
 type NowPlaying = {
@@ -46,6 +48,7 @@ const classes: Record<ClassName, Course> = {
       "https://docs.google.com/presentation/d/e/2PACX-1vRgslakriUyYQGy1msjc1zXR_TVxWwv-b8P93rjufV0kAs5FrdqpEXWAFBBqPuair9fCV-czPu5EVy6/pubembed?start=false&loop=false&delayms=3000",
     discussion:
       "Which matters more in shaping a civilization: its ideas, its institutions, or its people?",
+    documentUrl: "",
   },
 
   usHistory: {
@@ -54,6 +57,7 @@ const classes: Record<ClassName, Course> = {
     slides: "",
     discussion:
       "How should Americans decide which parts of the nation's past deserve celebration, criticism, or both?",
+    documentUrl: "",
   },
 
   usGovernment: {
@@ -62,6 +66,7 @@ const classes: Record<ClassName, Course> = {
     slides: "",
     discussion:
       "When should individual liberty outweigh the interests of the larger society?",
+    documentUrl: "",
   },
 
   sociology: {
@@ -70,6 +75,7 @@ const classes: Record<ClassName, Course> = {
     slides: "",
     discussion:
       "Does society shape people more than people shape society?",
+    documentUrl: "",
   },
 
   drama: {
@@ -78,6 +84,7 @@ const classes: Record<ClassName, Course> = {
     slides: "",
     discussion:
       "What makes a performance feel truthful even when the audience knows it is fictional?",
+    documentUrl: "",
   },
 };
 
@@ -103,6 +110,14 @@ const defaultDiscussions: Record<ClassName, string> = {
   usGovernment: classes.usGovernment.discussion,
   sociology: classes.sociology.discussion,
   drama: classes.drama.discussion,
+};
+
+const defaultDocuments: Record<ClassName, string> = {
+  worldHistory: classes.worldHistory.documentUrl,
+  usHistory: classes.usHistory.documentUrl,
+  usGovernment: classes.usGovernment.documentUrl,
+  sociology: classes.sociology.documentUrl,
+  drama: classes.drama.documentUrl,
 };
 
 const defaultTicker =
@@ -230,6 +245,25 @@ function App() {
     return defaultDiscussions;
   });
 
+  const [documentsByClass, setDocumentsByClass] = useState<
+    Record<ClassName, string>
+  >(() => {
+    const saved = localStorage.getItem("classroomDocuments");
+
+    if (saved) {
+      try {
+        return {
+          ...defaultDocuments,
+          ...JSON.parse(saved),
+        };
+      } catch {
+        return defaultDocuments;
+      }
+    }
+
+    return defaultDocuments;
+  });
+
   const [ticker, setTicker] = useState<string>(() => {
     return localStorage.getItem("classroomTicker") || defaultTicker;
   });
@@ -295,6 +329,13 @@ function App() {
       JSON.stringify(discussionsByClass),
     );
   }, [discussionsByClass]);
+
+  useEffect(() => {
+    localStorage.setItem(
+      "classroomDocuments",
+      JSON.stringify(documentsByClass),
+    );
+  }, [documentsByClass]);
 
   useEffect(() => {
     localStorage.setItem("classroomTicker", ticker);
@@ -546,7 +587,7 @@ useEffect(() => {
     } = await supabase
       .from("class_content")
       .select(
-        "class_id, bell_ringer, slides_url, discussion_prompt"
+        "class_id, bell_ringer, slides_url, discussion_prompt, document_url"
       );
 
     if (classError) {
@@ -567,6 +608,10 @@ useEffect(() => {
         ...defaultDiscussions,
       };
 
+      const nextDocuments = {
+        ...defaultDocuments,
+      };
+
       classRows.forEach((row) => {
         const classId =
           row.class_id as ClassName;
@@ -580,12 +625,16 @@ useEffect(() => {
 
           nextDiscussions[classId] =
             row.discussion_prompt ?? "";
+
+          nextDocuments[classId] =
+            row.document_url ?? "";
         }
       });
 
       setBellRingers(nextBellRingers);
       setSlidesByClass(nextSlides);
       setDiscussionsByClass(nextDiscussions);
+      setDocumentsByClass(nextDocuments);
     }
 
     // --------------------------------
@@ -642,6 +691,7 @@ useEffect(() => {
       bell_ringer: string | null;
       slides_url: string | null;
       discussion_prompt: string | null;
+      document_url: string | null;
     };
 
     type DisplaySettingsRealtimeRow = {
@@ -683,6 +733,11 @@ useEffect(() => {
           setDiscussionsByClass((previous) => ({
             ...previous,
             [classId]: row.discussion_prompt ?? "",
+          }));
+
+          setDocumentsByClass((previous) => ({
+            ...previous,
+            [classId]: row.document_url ?? "",
           }));
         },
       )
@@ -736,6 +791,7 @@ useEffect(() => {
     bellRinger: bellRingers[currentClass],
     slides: slidesByClass[currentClass],
     discussion: discussionsByClass[currentClass],
+    documentUrl: documentsByClass[currentClass],
   };
 
   return (
@@ -761,6 +817,14 @@ useEffect(() => {
         <DiscussionScreen prompt={course.discussion} />
       )}
 
+      {screenState === "document" && (
+        <DocumentScreen
+          url={course.documentUrl}
+          title={currentClass === "drama" ? "Script" : "Class Document"}
+          exit={() => setScreenState("arrival")}
+        />
+      )}
+
       {screenState === "timer" && (
         <TimerScreen
           seconds={timerSeconds}
@@ -773,7 +837,7 @@ useEffect(() => {
         />
       )}
 
-      {screenState !== "lesson" && (
+      {screenState !== "lesson" && screenState !== "document" && (
         <TeacherControls
           currentClass={currentClass}
           changeClass={setCurrentClass}
@@ -789,6 +853,7 @@ useEffect(() => {
           bellRinger={bellRingers[currentClass]}
           slides={slidesByClass[currentClass]}
           discussion={discussionsByClass[currentClass]}
+          documentUrl={documentsByClass[currentClass]}
           ticker={ticker}
           nowPlaying={nowPlaying}
           automaticHistoryMoment={automaticHistoryMoment}
@@ -798,6 +863,8 @@ useEffect(() => {
             bellRinger,
             slides,
             discussion,
+            documentUrl,
+            documentFile,
             newTicker,
             newNowPlaying,
             newHistoryOverride,
@@ -811,6 +878,49 @@ useEffect(() => {
             const cleanBellRinger = bellRinger.trim();
             const cleanSlides = normalizeGoogleSlidesUrl(slides);
             const cleanDiscussion = discussion.trim();
+            let cleanDocumentUrl = documentUrl.trim();
+
+            if (documentFile) {
+              const isPdf =
+                documentFile.type === "application/pdf" ||
+                documentFile.name.toLowerCase().endsWith(".pdf");
+
+              if (!isPdf) {
+                window.alert("Please choose a PDF file.");
+                return false;
+              }
+
+              const safeName = documentFile.name
+                .replace(/[^a-zA-Z0-9._-]+/g, "-")
+                .replace(/-+/g, "-");
+
+              const filePath =
+                `${currentClass}/${Date.now()}-${safeName}`;
+
+              const { error: uploadError } = await supabase.storage
+                .from("classroom-documents")
+                .upload(filePath, documentFile, {
+                  contentType: "application/pdf",
+                  cacheControl: "3600",
+                  upsert: false,
+                });
+
+              if (uploadError) {
+                console.error("Document upload error:", uploadError);
+                window.alert(
+                  "The PDF could not be uploaded. Check your Supabase Storage setup and try again.",
+                );
+                return false;
+              }
+
+              const { data: publicUrlData } = supabase.storage
+                .from("classroom-documents")
+                .getPublicUrl(filePath);
+
+              cleanDocumentUrl =
+                `${publicUrlData.publicUrl}?v=${Date.now()}`;
+            }
+
             const cleanTicker = newTicker.trim();
             const cleanNowPlaying = {
               title: newNowPlaying.title.trim(),
@@ -829,6 +939,7 @@ useEffect(() => {
                   bell_ringer: cleanBellRinger,
                   slides_url: cleanSlides,
                   discussion_prompt: cleanDiscussion,
+                  document_url: cleanDocumentUrl,
                   updated_at: updatedAt,
                 })
                 .eq("class_id", currentClass)
@@ -872,6 +983,11 @@ useEffect(() => {
             setDiscussionsByClass((previous) => ({
               ...previous,
               [currentClass]: cleanDiscussion,
+            }));
+
+            setDocumentsByClass((previous) => ({
+              ...previous,
+              [currentClass]: cleanDocumentUrl,
             }));
 
             setTicker(cleanTicker);
@@ -1036,6 +1152,47 @@ function LessonScreen({
         className="exitLesson"
         onClick={exitLesson}
         aria-label="Exit lesson"
+      >
+        ×
+      </button>
+    </section>
+  );
+}
+
+/* -------------------------------- */
+/* DOCUMENT SCREEN                  */
+/* -------------------------------- */
+
+function DocumentScreen({
+  url,
+  title,
+  exit,
+}: {
+  url: string;
+  title: string;
+  exit: () => void;
+}) {
+  return (
+    <section className="documentScreen">
+      {url ? (
+        <iframe
+          src={url}
+          className="documentViewer"
+          title={title}
+          allowFullScreen
+        />
+      ) : (
+        <div className="documentEmpty">
+          <small>{title.toUpperCase()}</small>
+          <h1>No PDF has been added for this class.</h1>
+          <p>Open Setup to upload or link a document.</p>
+        </div>
+      )}
+
+      <button
+        className="exitLesson documentExit"
+        onClick={exit}
+        aria-label="Exit document"
       >
         ×
       </button>
@@ -1215,8 +1372,8 @@ function TeacherControls({
             Lesson
           </button>
 
-          <button onClick={() => goTo("discussion")}>
-            Discussion
+          <button onClick={() => goTo("document")}>
+            {currentClass === "drama" ? "Script" : "Document"}
           </button>
 
           <button onClick={() => goTo("timer")}>
@@ -1387,6 +1544,7 @@ function ControlCenter({
   bellRinger,
   slides,
   discussion,
+  documentUrl,
   ticker,
   nowPlaying,
   automaticHistoryMoment,
@@ -1399,6 +1557,7 @@ function ControlCenter({
   bellRinger: string;
   slides: string;
   discussion: string;
+  documentUrl: string;
   ticker: string;
   nowPlaying: NowPlaying;
   automaticHistoryMoment: HistoryMoment;
@@ -1408,6 +1567,8 @@ function ControlCenter({
     bellRinger: string,
     slides: string,
     discussion: string,
+    documentUrl: string,
+    documentFile: File | null,
     ticker: string,
     nowPlaying: NowPlaying,
     historyOverride: HistoryMoment,
@@ -1421,6 +1582,12 @@ function ControlCenter({
 
   const [discussionDraft, setDiscussionDraft] =
     useState(discussion);
+
+  const [documentUrlDraft, setDocumentUrlDraft] =
+    useState(documentUrl);
+
+  const [documentFileDraft, setDocumentFileDraft] =
+    useState<File | null>(null);
 
   const [tickerDraft, setTickerDraft] =
     useState(ticker);
@@ -1444,6 +1611,8 @@ function ControlCenter({
     setBellRingerDraft(bellRinger);
     setSlidesDraft(slides);
     setDiscussionDraft(discussion);
+    setDocumentUrlDraft(documentUrl);
+    setDocumentFileDraft(null);
     setTickerDraft(ticker);
     setNowPlayingTitleDraft(nowPlaying.title);
     setNowPlayingArtistDraft(nowPlaying.artist);
@@ -1453,6 +1622,7 @@ function ControlCenter({
     bellRinger,
     slides,
     discussion,
+    documentUrl,
     ticker,
     nowPlaying.title,
     nowPlaying.artist,
@@ -1548,6 +1718,69 @@ function ControlCenter({
 
             <p className="controlHint">
               Normal Google Slides links, embed links, and iframe code all work.
+            </p>
+          </div>
+
+          <div className="controlGroup">
+            <label htmlFor="class-document">
+              {currentClass === "drama" ? "Script PDF" : "Class Document"}
+            </label>
+
+            <div className="documentUploadRow">
+              <label
+                className="documentChooseButton"
+                htmlFor="class-document"
+              >
+                Choose PDF
+              </label>
+
+              <input
+                id="class-document"
+                className="documentFileInput"
+                type="file"
+                accept="application/pdf,.pdf"
+                onChange={(event) => {
+                  const file = event.target.files?.[0] ?? null;
+                  setDocumentFileDraft(file);
+                }}
+              />
+
+              <span className="documentFileName">
+                {documentFileDraft
+                  ? documentFileDraft.name
+                  : documentUrlDraft
+                    ? "Current document ready"
+                    : "No document selected"}
+              </span>
+            </div>
+
+            <input
+              className="documentUrlInput"
+              type="url"
+              value={documentUrlDraft}
+              onChange={(event) => {
+                setDocumentUrlDraft(event.target.value);
+                setDocumentFileDraft(null);
+              }}
+              placeholder="Or paste a direct PDF URL..."
+            />
+
+            <div className="documentActions">
+              {documentUrlDraft && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDocumentUrlDraft("");
+                    setDocumentFileDraft(null);
+                  }}
+                >
+                  Clear document
+                </button>
+              )}
+            </div>
+
+            <p className="controlHint">
+              Uploading a PDF replaces the document shown for this class after you choose Save All.
             </p>
           </div>
 
@@ -1685,6 +1918,8 @@ function ControlCenter({
                 bellRingerDraft,
                 slidesDraft,
                 discussionDraft,
+                documentUrlDraft,
+                documentFileDraft,
                 tickerDraft,
                 {
                   title: nowPlayingTitleDraft,

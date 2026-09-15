@@ -1125,3 +1125,192 @@ button {
   z-index: 90;
 }
 
+/* =========================================
+   DOCUMENT / PDF VIEWER
+   ========================================= */
+
+.documentScreen {
+  width: 100%;
+  height: 100%;
+
+  position: relative;
+
+  background: #202124;
+  overflow: hidden;
+}
+
+.documentViewer {
+  width: 100%;
+  height: 100%;
+
+  display: block;
+
+  border: none;
+  background: #ffffff;
+}
+
+.documentEmpty {
+  width: 100%;
+  height: 100%;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  padding: 8vw;
+  text-align: center;
+
+  background:
+    radial-gradient(
+      circle at 50% 42%,
+      rgba(185, 120, 50, 0.08),
+      transparent 34%
+    ),
+    #111111;
+
+  color: #f3efe5;
+}
+
+.documentEmpty small {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+
+  color: #b97832;
+}
+
+.documentEmpty h1 {
+  margin: 18px 0 8px;
+
+  font-family: "Archivo", sans-serif;
+  font-size: clamp(2.4rem, 5vw, 5rem);
+  letter-spacing: -0.05em;
+}
+
+.documentEmpty p {
+  margin: 0;
+
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.85rem;
+
+  color: #aaa39a;
+}
+
+.documentExit {
+  z-index: 20;
+  opacity: 0.35;
+}
+
+/* =========================================
+   CONTROL CENTER DOCUMENT UPLOAD
+   ========================================= */
+
+.documentUploadRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  flex-wrap: wrap;
+}
+
+.documentFileInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+
+  opacity: 0;
+  pointer-events: none;
+}
+
+.documentChooseButton {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+
+  margin: 0 !important;
+  padding: 10px 14px;
+
+  border: 1px solid #111111;
+  border-radius: 999px;
+
+  background: #111111;
+  color: #f3efe5;
+
+  font-family: "IBM Plex Mono", monospace !important;
+  font-size: 0.72rem !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.04em;
+
+  cursor: pointer;
+}
+
+.documentFileName {
+  min-width: 0;
+
+  color: #67625c;
+
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.72rem;
+
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.documentUrlInput {
+  width: 100%;
+  margin-top: 10px;
+  padding: 12px 13px;
+
+  border: 1px solid rgba(17, 17, 17, 0.22);
+  border-radius: 7px;
+
+  background: rgba(255, 255, 255, 0.48);
+  color: #111111;
+
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.78rem;
+
+  outline: none;
+}
+
+.documentUrlInput:focus {
+  border-color: #b97832;
+  box-shadow: 0 0 0 3px rgba(185, 120, 50, 0.12);
+}
+
+.documentActions {
+  display: flex;
+  justify-content: flex-end;
+
+  margin-top: 8px;
+}
+
+.documentActions button {
+  padding: 7px 11px;
+
+  border: 1px solid rgba(17, 17, 17, 0.18);
+  border-radius: 999px;
+
+  background: transparent;
+  color: #5f5a54;
+
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.68rem;
+
+  cursor: pointer;
+}
+
+@media (max-width: 700px) {
+  .documentUploadRow {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .documentFileName {
+    width: 100%;
+  }
+}
+
